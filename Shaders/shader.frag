@@ -46,7 +46,21 @@ void main()
 {
     // วัสดุสีขาวอมเทาแบบ Blender Solid View: ไม่ใช้ texture
     // แต่ยังรับ ambient, diffuse และ specular จึงมองเห็นความลึกของพื้นผิว
-    const vec3 baseColour = vec3(0.82f);
-    vec3 litColour = baseColour * (ambientLight() + diffuseLight()) + specularLight();
-    colour = vec4(clamp(litColour, 0.0f, 1.0f), 1.0f);
+    // const vec3 baseColour = vec3(0.82f);
+    // vec3 litColour = baseColour * (ambientLight() + diffuseLight()) + specularLight();
+    // colour = vec4(clamp(litColour, 0.0f, 1.0f), 1.0f);
+
+    // texture
+    vec4 texColor = texture(texture_data, TexCoord);
+
+    // คำนวนแสง
+    vec3 ambient  = ambientLight();
+    vec3 diffuse  = diffuseLight();
+    vec3 specular = specularLight();
+
+    // รวมแสง + texture
+    vec3 litColour = texColor.rgb * (ambient + diffuse) + specular;
+
+    // final colour
+    colour = vec4(clamp(litColour, 0.0f, 1.0f), texColor.a);
 }
