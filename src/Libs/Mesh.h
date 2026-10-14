@@ -1,62 +1,71 @@
-#ifndef MESH____H
-#define MESH____H
+#pragma once
 
+#include <GL/glew.h>
+#include <glm/glm.hpp>
+
+#include <cstddef>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
-#include <glm/vec2.hpp>
-#include <glm/vec3.hpp>
-#include <GL/glew.h>
-
-
-// Interleaved vertex: position (3), normal (3), uv (2)
-struct VertexPNU 
+// โครงสร้างข้อมูล vertex แบบ interleaved: ตำแหน่ง + UV + normal
+struct VertexPNU
 {
-    glm::vec3 position{};
-    glm::vec3 normal{};
-    glm::vec2 uv{};
+    glm::vec3 position{0.0f};
+    glm::vec3 normal{0.0f};
+    glm::vec2 uv{0.0f};
 };
 
-class Mesh 
+class Mesh
 {
-    public:
-        Mesh();
-        ~Mesh();
+public:
+    Mesh();
+    ~Mesh();
 
-        // Create from client-provided interleaved vertex array (8 floats per vertex: P(3) N(3) UV(2))
-        // Common in many tutorials; kept for compatibility.
-        void CreateMesh(const GLfloat* vertices,
-                const unsigned int* indices,
-                unsigned int numOfFloats,
-                unsigned int numOfIndices);
+    // สร้าง Mesh จาก array แบบเดิม เพื่อให้โค้ดส่วนอื่นของโปรเจกต์ยังเรียกใช้ได้
+    void CreateMesh(const GLfloat* vertices,
+                    const unsigned int* indices,
+                    unsigned int numOfFloats,
+                    unsigned int numOfIndices);
 
-        // Create from interleaved vector of VertexPNU (preferred)
-        void CreateMesh(const std::vector<VertexPNU>& vertices,
-        const std::vector<unsigned int>& indices);
+    void CreateMesh(const std::vector<VertexPNU>& vertices,
+                    const std::vector<unsigned int>& indices);
 
-        // Load from .obj (supports v, vt, vn; faces in v/vt/vn, v//vn, v/vt, or v)
-        // Handles negative indices; triangulates n-gons via fan.
-        // flipV = true to flip the V coordinate (uv.y = 1 - uv.y)
-        bool CreateMeshFromOBJ(const std::string& path, bool flipV = false);
+    // โหลด OBJ พร้อม material จาก MTL และ texture ที่ระบุด้วย map_Kd
+    // flipV = true ใช้กลับแกน V ของ UV เมื่อ texture แสดงกลับหัว
+    bool CreateMeshFromOBJ(const std::string& path, bool flipV = false);
 
-        void RenderMesh() const;
-        void ClearMesh();
+    // วาด Mesh โดยเลือก texture/material ตามช่วง usemtl ใน OBJ
+    // ส่ง location ของ uniform จาก shader.frag เข้ามา
+    void RenderMesh(GLint textureUniformLocation = -1,
+                    GLint useTextureUniformLocation = -1,
+                    GLint diffuseUniformLocation = -1) const;
 
-        // Accessors
-        inline GLsizei GetIndexCount() const { return indexCount; }
-        inline GLuint GetVAO() const { return VAO; }
+    void ClearMesh();
 
-    private:
-        // GL resources
-        GLuint VAO{0};
-        GLuint VBO{0};
-        GLuint IBO{0};
+private:
+    struct MaterialInfo
+    {
+        glm::vec3 diffuse{0.8f, 0.8f, 0.8f}; // สีสำรองจาก MTL: Kd
+        GLuint textureId = 0;                // texture จาก MTL: map_Kd
+    };
 
-        GLsizei indexCount{0};
+    struct MaterialBatch
+    {
+        std::string materialName;
+        std::size_t firstIndex = 0; // index แรกของกลุ่มนี้ใน EBO
+        GLsizei indexCount = 0;     // จำนวน index ที่ต้องวาด
+    };
 
-        // Internal helper used by OBJ loader
-        void uploadInterleaved_(const std::vector<VertexPNU>& vertices,
-        const std::vector<unsigned int>& indices);
+    void uploadInterleaved_(const std::vector<VertexPNU>& vertices,
+                            const std::vector<unsigned int>& indices);
+
+    GLuint VAO = 0;
+    GLuint VBO = 0;
+    GLuint IBO = 0;
+    GLsizei indexCount = 0;
+
+    // รายการวัสดุที่อ่านมาจากไฟล์ MTL และช่วง index ของแต่ละ usemtl
+    std::unordered_map<std::string, MaterialInfo> materials_;
+    std::vector<MaterialBatch> materialBatches_;
 };
-
-#endif
