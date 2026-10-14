@@ -96,7 +96,7 @@ int main()
 	glEnable(GL_DEPTH_TEST);
 	Mesh meru;
 	const std::filesystem::path objPath =
-    	modelDirectory / "meru-new-edited.obj";
+    	modelDirectory / "meru.obj";
 	std::cerr << "[3] Loading OBJ: "
     	      << objPath.string() << std::endl;
 	if (!meru.CreateMeshFromOBJ(objPath.string()))
