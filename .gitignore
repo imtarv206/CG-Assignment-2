@@ -18,7 +18,6 @@ CMakeUserPresets.json
 *.dll
 *.lib
 *.pdb
-*.obj
 *.o
 *.a
 
@@ -29,5 +28,3 @@ Thumbs.db
 # Temporary working files
 tmp/
 
-# Keep the optimized assignment model while ignoring compiler .obj files
-!Models/Meru-lowpoly-clean.obj
