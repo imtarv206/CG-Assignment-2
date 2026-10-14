@@ -89,6 +89,7 @@ configure_file(
 
 add_executable(OpenGLStarter
   src/main.cpp
+  src/SmokeSystem.cpp
   src/Libs/Mesh.cpp
   src/Libs/Shader.cpp
   src/Libs/Window.cpp

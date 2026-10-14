@@ -15,6 +15,7 @@
 #include "Libs/Shader.h"
 #include "Libs/Window.h"
 #include "ProjectPaths.h"
+#include "SmokeSystem.h"
 
 // กำหนด STB_IMAGE_IMPLEMENTATION ในไฟล์นี้เพียงไฟล์เดียวเท่านั้น
 #define STB_IMAGE_IMPLEMENTATION
@@ -133,6 +134,9 @@ int main()
     const glm::vec3 lightPos(3.0f, 8.0f, -5.0f);
     const glm::vec3 lightColour(1.0f, 1.0f, 1.0f);
 
+    // จุดปล่อยชั่วคราว จะปรับให้ตรงปากปล่องหลังจากเริ่มวาดควันได้แล้ว
+    SmokeSystem smokeSystem(glm::vec3(0.0f, 3.5f, -10.0f));
+
     const float aspect = static_cast<float>(mainWindow.getBufferWidth()) /
                          static_cast<float>(mainWindow.getBufferHeight());
     const glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 500.0f);
@@ -144,6 +148,8 @@ int main()
         const float currentTime = static_cast<float>(glfwGetTime());
         const float deltaTime = currentTime - previousTime;
         previousTime = currentTime;
+
+        smokeSystem.update(deltaTime, currentTime);
 
         glfwPollEvents();
         updateMouseLook(mainWindow);
