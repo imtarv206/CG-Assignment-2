@@ -14,6 +14,7 @@ CMakeUserPresets.json
 *.sln
 
 # Compiled output
+*.obj
 *.exe
 *.dll
 *.lib
@@ -28,3 +29,13 @@ Thumbs.db
 # Temporary working files
 tmp/
 
+# Keep large intermediate models only on this computer
+Models/Meru-lowpoly-v2.obj
+Models/meru-new.obj
+
+# Local backup copies
+/Meru-lowpoly-v2-backup.obj
+/meru-new-backup.obj
+
+# Keep the required edited model despite the global *.obj rule
+!Models/meru-new-edited.obj
