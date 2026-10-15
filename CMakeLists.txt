@@ -91,6 +91,7 @@ add_executable(OpenGLStarter
   src/main.cpp
   src/ShadowMap.cpp
   src/SmokeSystem.cpp
+  src/FlameRenderer.cpp
   src/Libs/Mesh.cpp
   src/Libs/Shader.cpp
   src/Libs/Window.cpp

@@ -19,7 +19,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-map_Kd C:/CG/Assignment-2/OpenGLStarter/Textures/Grunge_S.jpg
+map_Kd Grunge_S.jpg
 
 newmtl Pavers_Flagstone_Gray
 Ns 250.000000
@@ -29,7 +29,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-map_Kd C:/CG/Assignment-2/OpenGLStarter/Textures/Stone_Pavers_Flagstone_Gray.jpg
+map_Kd Stone_Pavers_Flagstone_Gray.jpg
 
 newmtl Porcelain_B01_White_10cm
 Ns 250.000000
@@ -39,7 +39,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-map_Kd C:/CG/Assignment-2/OpenGLStarter/Textures/Porcelain_B_Mask.jpg
+map_Kd Porcelain_B_Mask.jpg
 
 newmtl Stacy_Shoe_Laces_Sole
 Ns 250.000000
@@ -59,7 +59,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-map_Kd C:/CG/Assignment-2/OpenGLStarter/Textures/ff90bf4fb92d2febe2b15d0027169aef.jpg
+map_Kd ff90bf4fb92d2febe2b15d0027169aef.jpg
 
 newmtl [Blacktop_Old_01]
 Ns 250.000000
@@ -69,7 +69,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-map_Kd C:/CG/Assignment-2/OpenGLStarter/Textures/Blacktop Old 01.jpg
+map_Kd Blacktop Old 01.jpg
 
 newmtl [Color_C01]
 Ns 250.000000
@@ -79,7 +79,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-map_Kd C:/CG/Assignment-2/OpenGLStarter/Textures/14591633_10154430326500295_8625005294656352946_n.jpg
+map_Kd 14591633_10154430326500295_8625005294656352946_n.jpg
 
 newmtl [Color_M02]
 Ns 250.000000
@@ -129,7 +129,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-map_Kd C:/CG/Assignment-2/OpenGLStarter/Textures/Fencing_Chain_Link.png
+map_Kd Fencing_Chain_Link.png
 
 newmtl [Metal_Corrugated_Shiny]
 Ns 250.000000
@@ -139,7 +139,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-map_Kd C:/CG/Assignment-2/OpenGLStarter/Textures/Metal_Corrogated_Shiny.jpg
+map_Kd Metal_Corrogated_Shiny.jpg
 
 newmtl [Metal_Rough]
 Ns 250.000000
@@ -149,7 +149,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-map_Kd C:/CG/Assignment-2/OpenGLStarter/Textures/Metal_Rough.jpg
+map_Kd Metal_Rough.jpg
 
 newmtl [Metal_Seamed]
 Ns 250.000000
@@ -159,7 +159,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-map_Kd C:/CG/Assignment-2/OpenGLStarter/Textures/Metal_Seamed.jpg
+map_Kd Metal_Seamed.jpg
 
 newmtl [Metal_Silver]
 Ns 250.000000
@@ -169,7 +169,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-map_Kd C:/CG/Assignment-2/OpenGLStarter/Textures/Metal Silver.jpg
+map_Kd Metal Silver.jpg
 
 newmtl [Polished_Concrete_Old]
 Ns 250.000000
@@ -179,7 +179,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-map_Kd C:/CG/Assignment-2/OpenGLStarter/Textures/Polished Concrete Old.jpg
+map_Kd Polished Concrete Old.jpg
 
 newmtl [Quartz_Light_Grey]
 Ns 250.000000
@@ -189,7 +189,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-map_Kd C:/CG/Assignment-2/OpenGLStarter/Textures/Quartz Light Grey.jpg
+map_Kd Quartz Light Grey.jpg
 
 newmtl [Roofing_Scalloped_Ornate]
 Ns 250.000000
@@ -199,7 +199,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-map_Kd C:/CG/Assignment-2/OpenGLStarter/Textures/Roofing Scalloped Ornate.jpg
+map_Kd Roofing Scalloped Ornate.jpg
 
 newmtl [White_Subway_Tile]
 Ns 250.000000
@@ -209,7 +209,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-map_Kd C:/CG/Assignment-2/OpenGLStarter/Textures/White Subway Tile.jpg
+map_Kd White Subway Tile.jpg
 
 newmtl [Wood_Veneer_01]
 Ns 250.000000
@@ -219,7 +219,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-map_Kd C:/CG/Assignment-2/OpenGLStarter/Textures/Wood 01.jpg
+map_Kd Wood 01.jpg
 
 newmtl 丝吉利娅内开内倒窗
 Ns 250.000000

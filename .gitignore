@@ -33,9 +33,5 @@ tmp/
 Models/Meru-lowpoly-v2.obj
 Models/meru-new.obj
 
-# Local backup copies
-/Meru-lowpoly-v2-backup.obj
-/meru-new-backup.obj
-
 # Keep the required edited model despite the global *.obj rule
-!Models/meru-new-edited.obj
+!Models/meru.obj

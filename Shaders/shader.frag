@@ -19,13 +19,17 @@ uniform vec3 fogColour;
 uniform float fogDensity;
 uniform sampler2D shadowMap;
 
-// เปรียบเทียบ depth จากมุมมองแสง และเฉลี่ยตัวอย่าง 3x3 ให้ขอบเงานุ่ม
+// Flickering local point light emitted by the procedural flame.
+uniform vec3 fireLightPosition;
+uniform vec3 fireLightColour;
+uniform float fireLightIntensity;
+uniform float fireLightRadius;
+
 float shadowCalculation()
 {
     vec3 projected = FragPosLightSpace.xyz / FragPosLightSpace.w;
     projected = projected * 0.5f + 0.5f;
 
-    // พื้นที่นอก frustum ของแสงไม่มีข้อมูลใน depth map และต้องไม่ถูกทำให้มืด
     if (projected.z <= 0.0f || projected.z >= 1.0f ||
         projected.x <= 0.0f || projected.x >= 1.0f ||
         projected.y <= 0.0f || projected.y >= 1.0f)
@@ -47,18 +51,15 @@ float shadowCalculation()
             shadow += projected.z - bias > closestDepth ? 1.0f : 0.0f;
         }
     }
-
     return shadow / 9.0f;
 }
 
-// แสง Ambient: เพิ่มความสว่างพื้นฐานไม่ให้ด้านเงามืดสนิท
 vec3 ambientLight()
 {
     const float ambientStrength = 0.25f;
     return ambientColour * ambientStrength;
 }
 
-// แสง Diffuse: ทำให้พื้นผิวที่หันเข้าหาแสงสว่างกว่าพื้นผิวที่หันออก
 vec3 diffuseLight()
 {
     const float diffuseStrength = 0.80f;
@@ -68,24 +69,64 @@ vec3 diffuseLight()
     return lightColour * diff * diffuseStrength;
 }
 
-// แสง Specular: เพิ่มไฮไลต์เล็กน้อยเพื่อช่วยให้เห็นมิติพื้นผิว
+// Subtle unshadowed directional bounce light reveals orientation within deep shadows.
+vec3 shadowFillLight()
+{
+    vec3 norm = normalize(Normal);
+    vec3 fillDirection = normalize(vec3(-0.35f, -0.45f, 0.82f));
+    float fill = max(dot(norm, fillDirection), 0.0f);
+    const float fillStrength = 0.32f;
+    const vec3 fillColour = vec3(0.42f, 0.37f, 0.31f);
+    return fillColour * fill * fillStrength;
+}
+
 vec3 specularLight()
 {
     const float specularStrength = 0.18f;
     const float shininess = 32.0f;
-
     vec3 norm = normalize(Normal);
     vec3 lightDir = normalize(lightPos - FragPos);
     vec3 viewDir = normalize(viewPos - FragPos);
     vec3 halfDir = normalize(lightDir + viewDir);
-
     float spec = pow(max(dot(norm, halfDir), 0.0f), shininess);
     return lightColour * spec * specularStrength;
 }
 
+// Local warm illumination. It falls off with distance and is deliberately separate
+// from the main light's shadow term, so firelight can add warm bounce to shadowed areas.
+vec3 fireDiffuseLight()
+{
+    vec3 toFire = fireLightPosition - FragPos;
+    float distanceToFire = length(toFire);
+    if (distanceToFire >= fireLightRadius || distanceToFire <= 0.0001f)
+        return vec3(0.0f);
+
+    vec3 norm = normalize(Normal);
+    vec3 lightDir = toFire / distanceToFire;
+    float diffuse = max(dot(norm, lightDir), 0.0f);
+    float falloff = clamp(1.0f - distanceToFire / fireLightRadius, 0.0f, 1.0f);
+    float attenuation = falloff * falloff;
+    return fireLightColour * diffuse * attenuation * fireLightIntensity;
+}
+
+vec3 fireSpecularLight()
+{
+    vec3 toFire = fireLightPosition - FragPos;
+    float distanceToFire = length(toFire);
+    if (distanceToFire >= fireLightRadius || distanceToFire <= 0.0001f)
+        return vec3(0.0f);
+
+    vec3 norm = normalize(Normal);
+    vec3 lightDir = toFire / distanceToFire;
+    vec3 viewDir = normalize(viewPos - FragPos);
+    vec3 halfDir = normalize(lightDir + viewDir);
+    float spec = pow(max(dot(norm, halfDir), 0.0f), 24.0f);
+    float falloff = clamp(1.0f - distanceToFire / fireLightRadius, 0.0f, 1.0f);
+    return fireLightColour * spec * falloff * falloff * fireLightIntensity * 0.12f;
+}
+
 void main()
 {
-    // ถ้ามี map_Kd ให้นำสีภาพมาใช้; ถ้าไม่มีให้ใช้ค่า Kd จากไฟล์ MTL
     vec3 baseColour = materialDiffuse;
     float alpha = 1.0f;
     if (useTexture)
@@ -95,18 +136,17 @@ void main()
         alpha = texel.a;
     }
 
-    // เงาลดเฉพาะ diffuse/specular ส่วน ambient ยังทำให้บริเวณเงาเห็นรายละเอียด
     float shadow = shadowCalculation();
     vec3 directLight = (1.0f - shadow) * diffuseLight();
     vec3 reflectedLight = (1.0f - shadow) * specularLight();
-    vec3 litColour = baseColour * (ambientLight() + directLight) + reflectedLight;
+    vec3 litColour = baseColour * (
+        ambientLight() + directLight + shadowFillLight() + fireDiffuseLight())
+        + reflectedLight + fireSpecularLight();
 
-    // หมอกแบบ exponential ช่วยให้วัตถุที่ไกลค่อยๆ กลืนกับสีท้องฟ้า
     float cameraDistance = length(viewPos - FragPos);
     float fogAmount = 1.0f - exp(
         -fogDensity * fogDensity * cameraDistance * cameraDistance);
     fogAmount = clamp(fogAmount, 0.0f, 1.0f);
-
     vec3 finalColour = mix(litColour, fogColour, fogAmount);
     colour = vec4(clamp(finalColour, 0.0f, 1.0f), alpha);
 }

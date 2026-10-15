@@ -10,6 +10,7 @@
 #include <cmath>
 #include <filesystem>
 #include <iostream>
+#include <iomanip>
 #include <vector>
 
 #include "Libs/Mesh.h"
@@ -17,6 +18,7 @@
 #include "Libs/Window.h"
 #include "ProjectPaths.h"
 #include "ShadowMap.h"
+#include "FlameRenderer.h"
 #include "SmokeSystem.h"
 
 // กำหนด STB_IMAGE_IMPLEMENTATION ในไฟล์นี้เพียงไฟล์เดียวเท่านั้น
@@ -30,8 +32,12 @@ namespace
     constexpr GLint WINDOW_HEIGHT = 600;
 
     // ค่ามุมกล้องเริ่มต้น: หันไปทางแกน -Z
-    float yaw = -90.0f;
-    float pitch = 0.0f;
+    // float yaw = -90.0f;
+    // float pitch = 0.0f;
+
+    // ค่ามุมกล้องเริ่มต้น: test
+    float yaw = -142.0f;
+    float pitch = 8.0f;
 
     const std::filesystem::path shaderDirectory =
         std::filesystem::u8path(OPENGL_STARTER_SHADER_DIR);
@@ -123,7 +129,22 @@ int main()
     }
     std::cerr << "[SMOKE] Texture, shader, and billboard quad are ready.\n";
 
-    // Shadow map ตาม Lab 13: depth texture 1024x1024 และ shader สำหรับ pass แรก
+    // ตั้งตำแหน่งฐานไฟในพิกัดโลก และกำหนดความกว้าง/ความสูงของบริเวณกำเนิดอนุภาค
+    // ปรับ X/Y/Z เพื่อย้ายตำแหน่งไฟ โดยไม่ต้องเปลี่ยนระบบกล้องหรือโมเดล
+    FlameRenderer flameRenderer;
+    if (!flameRenderer.initialise(
+            shaderDirectory / "flame.vert",
+            shaderDirectory / "flame.frag"))
+    {
+        std::cerr << "[ERROR] Cannot initialise flame rendering.\n";
+        return 1;
+    }
+    const glm::vec3 firePosition(-2.1f, 1.25f, -10.07f);
+    constexpr float fireWidth = 0.9f;
+    constexpr float fireHeight = 0.65f;
+    constexpr float fireGlowStrength = 0.85f;
+
+    // สร้าง Shadow Map ขนาด 1024x1024 และใช้ Shader สำหรับขั้นตอนสร้างแผนที่ความลึก
     ShadowMap shadowMap;
     if (!shadowMap.initialise(1024, 1024))
     {
@@ -193,9 +214,24 @@ int main()
     const GLint uniformLightView = sceneShader.GetUniformLocation("lightView");
     const GLint uniformLightProjection = sceneShader.GetUniformLocation("lightProjection");
     const GLint uniformShadowMap = sceneShader.GetUniformLocation("shadowMap");
+    const GLint uniformFireLightPosition = sceneShader.GetUniformLocation("fireLightPosition");
+    const GLint uniformFireLightColour = sceneShader.GetUniformLocation("fireLightColour");
+    const GLint uniformFireLightIntensity = sceneShader.GetUniformLocation("fireLightIntensity");
+    const GLint uniformFireLightRadius = sceneShader.GetUniformLocation("fireLightRadius");
+
+    if (uniformFireLightPosition < 0 || uniformFireLightColour < 0 ||
+        uniformFireLightIntensity < 0 || uniformFireLightRadius < 0)
+    {
+        std::cerr << "[ERROR] Scene shader is missing fire-light uniforms. "
+                     "Make sure the updated shader.frag is in the active shader directory.\n";
+        return 1;
+    }
+
+    // กล้องเริ่มต้น: test
+    glm::vec3 cameraPos(6.0f, 1.0f, -5.5f);
 
     // กล้องเริ่มต้นอยู่หน้าวัตถุและมองไปทาง -Z
-    glm::vec3 cameraPos(0.0f, 0.0f, 5.0f);
+    // glm::vec3 cameraPos(0.0f, 0.0f, 5.0f);
     glm::vec3 cameraDirection(0.0f, 0.0f, -1.0f);
     const glm::vec3 worldUp(0.0f, 1.0f, 0.0f);
 
@@ -206,7 +242,7 @@ int main()
     const glm::vec3 fogColour(0.20f, 0.34f, 0.39f);
     constexpr float fogDensity = 0.035f;
 
-    // Orthographic light camera ตาม Lab 13 ครอบตัวเมรุและพื้นบริเวณที่รับเงา
+    // กล้องแสงแบบ Orthographic ครอบคลุมตัวเมรุและพื้นที่ที่ต้องรับเงา
     const glm::mat4 lightProjection =
         glm::ortho(-14.0f, 14.0f, -14.0f, 14.0f, 0.1f, 40.0f);
     const glm::mat4 lightView = glm::lookAt(
@@ -219,6 +255,12 @@ int main()
     const glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 500.0f);
 
     float previousTime = static_cast<float>(glfwGetTime());
+
+    // แสดงค่ากล้องทุก 0.5 วินาทีเมื่อมีการเคลื่อนที่หรือหมุนมุมมอง
+    float lastCameraPrintTime = previousTime;
+    glm::vec3 lastPrintedCameraPos = cameraPos;
+    float lastPrintedYaw = yaw;
+    float lastPrintedPitch = pitch;
 
     while (!mainWindow.getShouldClose())
     {
@@ -243,6 +285,14 @@ int main()
         const glm::vec3 cameraRight = glm::normalize(glm::cross(cameraDirection, worldUp));
         const glm::vec3 cameraUp = glm::normalize(glm::cross(cameraRight, cameraDirection));
 
+        // อัปเดตอายุ ตำแหน่ง สี และการเกิดใหม่ของอนุภาคไฟในแต่ละเฟรม
+        flameRenderer.update(
+            deltaTime,
+            firePosition,
+            fireWidth,
+            fireHeight,
+            cameraRight);
+
         // ควบคุมกล้องด้วย W/A/S/D
         constexpr float moveSpeed = 5.0f;
         if (glfwGetKey(mainWindow.getWindow(), GLFW_KEY_W) == GLFW_PRESS)
@@ -254,9 +304,29 @@ int main()
         if (glfwGetKey(mainWindow.getWindow(), GLFW_KEY_D) == GLFW_PRESS)
             cameraPos += cameraRight * moveSpeed * deltaTime;
 
+        // พิมพ์พิกัดกล้องเป็นระยะ เพื่อไม่ให้ข้อความใน Console มากเกินไป
+        const bool cameraPositionChanged = glm::length(cameraPos - lastPrintedCameraPos) > 0.025f;
+        const bool cameraOrientationChanged =
+            std::fabs(yaw - lastPrintedYaw) > 0.35f ||
+            std::fabs(pitch - lastPrintedPitch) > 0.35f;
+        if ((cameraPositionChanged || cameraOrientationChanged) &&
+            currentTime - lastCameraPrintTime >= 0.5f)
+        {
+            std::cout << std::fixed << std::setprecision(3)
+                      << "[CAMERA] pos = glm::vec3(" << cameraPos.x << "f, "
+                      << cameraPos.y << "f, " << cameraPos.z << "f);  yaw = "
+                      << yaw << "f; pitch = " << pitch << "f; direction = ("
+                      << cameraDirection.x << ", " << cameraDirection.y << ", "
+                      << cameraDirection.z << ")\n";
+            lastCameraPrintTime = currentTime;
+            lastPrintedCameraPos = cameraPos;
+            lastPrintedYaw = yaw;
+            lastPrintedPitch = pitch;
+        }
+
         const glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraDirection, cameraUp);
 
-        // Pass 1: วาดตัวเมรุจากมุมมองแสงลง depth texture
+        // ขั้นตอนที่ 1: วาดตัวเมรุจากมุมมองของแสงลงใน Depth Texture
         shadowMap.beginDepthPass();
         depthShader.UseShader();
         glUniformMatrix4fv(depthUniformModel, 1, GL_FALSE, glm::value_ptr(model));
@@ -277,7 +347,7 @@ int main()
             mainWindow.getBufferWidth(),
             mainWindow.getBufferHeight());
 
-        // Pass 2: วาดฉากจากมุมมองกล้องและนำ depth texture มาคำนวณเงา
+        // ขั้นตอนที่ 2: วาดฉากจากมุมมองกล้องและใช้ Depth Texture คำนวณเงา
         // สีพื้นหลังต้องตรงกับสีหมอก ขอบฉากจึงจะกลมกลืน
         glClearColor(fogColour.r, fogColour.g, fogColour.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -295,6 +365,19 @@ int main()
         glUniform3fv(uniformAmbientColour, 1, glm::value_ptr(ambientColour));
         glUniform3fv(uniformFogColour, 1, glm::value_ptr(fogColour));
         glUniform1f(uniformFogDensity, fogDensity);
+
+        // แสงจุดสีอุ่นบริเวณฐานไฟช่วยให้พื้นผิวใกล้เคียงได้รับแสงจากเปลวไฟ
+        // ปรับความเข้มเล็กน้อยตามเวลาเพื่อให้แสงบนโมเดลกะพริบตามไฟ
+        const glm::vec3 fireLightColour(1.0f, 0.24f, 0.045f);
+        const float fireLightIntensity =
+            1.65f + 0.16f * std::sin(currentTime * 8.0f)
+                  + 0.09f * std::sin(currentTime * 14.7f);
+        constexpr float fireLightRadius = 4.5f;
+        glUniform3fv(uniformFireLightPosition, 1, glm::value_ptr(firePosition));
+        glUniform3fv(uniformFireLightColour, 1, glm::value_ptr(fireLightColour));
+        glUniform1f(uniformFireLightIntensity, fireLightIntensity);
+        glUniform1f(uniformFireLightRadius, fireLightRadius);
+
         glUniformMatrix4fv(uniformLightView, 1, GL_FALSE, glm::value_ptr(lightView));
         glUniformMatrix4fv(
             uniformLightProjection,
@@ -305,7 +388,7 @@ int main()
         glUniform1i(uniformShadowMap, 1);
         glActiveTexture(GL_TEXTURE0);
 
-        // Mesh จะ bind Texture และ draw แยกตามแต่ละ usemtl ในไฟล์ OBJ
+        // Mesh จะผูก Texture และวาดแยกตาม Material แต่ละรายการที่ระบุด้วย usemtl ในไฟล์ OBJ
         meru.RenderMesh(uniformTexture, uniformUseTexture, uniformDiffuse);
 
         // พื้นใช้ shader เดียวกัน จึงรับเงา แสง และหมอกได้ต่อเนื่องกับตัวเมรุ
@@ -316,7 +399,15 @@ int main()
             uniformDiffuse,
             groundColour);
 
-        // วาดควันหลังวัตถุทึบ เพื่อให้ depth test และ alpha blending ทำงานถูกต้อง
+        // วาดอนุภาคไฟหลังวัตถุทึบ เพื่อให้ผนังและอาคารบังไฟได้ด้วย Depth Test
+        flameRenderer.render(
+            view,
+            projection,
+            cameraRight,
+            cameraUp,
+            fireGlowStrength);
+
+        // วาดควันหลังวัตถุทึบ เพื่อให้ Depth Test และ Alpha Blending ทำงานถูกต้อง
         smokeSystem.render(
             view,
             projection,
