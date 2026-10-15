@@ -39,7 +39,11 @@ public:
     // ส่ง location ของ uniform จาก shader.frag เข้ามา
     void RenderMesh(GLint textureUniformLocation = -1,
                     GLint useTextureUniformLocation = -1,
-                    GLint diffuseUniformLocation = -1) const;
+                    GLint diffuseUniformLocation = -1,
+                    const glm::vec3& fallbackDiffuse = glm::vec3(0.8f)) const;
+
+    // Depth pass ไม่ใช้ material จึงวาด index ทั้งหมดได้ใน draw call เดียว
+    void RenderDepthOnly() const;
 
     void ClearMesh();
 

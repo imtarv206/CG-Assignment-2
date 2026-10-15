@@ -5,6 +5,7 @@ out vec4 colour;
 in vec2 TexCoord;
 in vec3 Normal;
 in vec3 FragPos;
+in vec4 FragPosLightSpace;
 
 uniform sampler2D texture_data;
 uniform bool useTexture;
@@ -16,6 +17,39 @@ uniform vec3 viewPos;
 uniform vec3 ambientColour;
 uniform vec3 fogColour;
 uniform float fogDensity;
+uniform sampler2D shadowMap;
+
+// เปรียบเทียบ depth จากมุมมองแสง และเฉลี่ยตัวอย่าง 3x3 ให้ขอบเงานุ่ม
+float shadowCalculation()
+{
+    vec3 projected = FragPosLightSpace.xyz / FragPosLightSpace.w;
+    projected = projected * 0.5f + 0.5f;
+
+    // พื้นที่นอก frustum ของแสงไม่มีข้อมูลใน depth map และต้องไม่ถูกทำให้มืด
+    if (projected.z <= 0.0f || projected.z >= 1.0f ||
+        projected.x <= 0.0f || projected.x >= 1.0f ||
+        projected.y <= 0.0f || projected.y >= 1.0f)
+        return 0.0f;
+
+    vec3 normal = normalize(Normal);
+    vec3 lightDirection = normalize(lightPos - FragPos);
+    float bias = max(0.004f * (1.0f - dot(normal, lightDirection)), 0.0006f);
+
+    vec2 texelSize = 1.0f / textureSize(shadowMap, 0);
+    float shadow = 0.0f;
+    for (int x = -1; x <= 1; ++x)
+    {
+        for (int y = -1; y <= 1; ++y)
+        {
+            float closestDepth = texture(
+                shadowMap,
+                projected.xy + vec2(x, y) * texelSize).r;
+            shadow += projected.z - bias > closestDepth ? 1.0f : 0.0f;
+        }
+    }
+
+    return shadow / 9.0f;
+}
 
 // แสง Ambient: เพิ่มความสว่างพื้นฐานไม่ให้ด้านเงามืดสนิท
 vec3 ambientLight()
@@ -61,8 +95,11 @@ void main()
         alpha = texel.a;
     }
 
-    // แสงสีส้มส่องตัวอาคาร โดยยังคง ambient โทนเย็นไว้ในบริเวณเงา
-    vec3 litColour = baseColour * (ambientLight() + diffuseLight()) + specularLight();
+    // เงาลดเฉพาะ diffuse/specular ส่วน ambient ยังทำให้บริเวณเงาเห็นรายละเอียด
+    float shadow = shadowCalculation();
+    vec3 directLight = (1.0f - shadow) * diffuseLight();
+    vec3 reflectedLight = (1.0f - shadow) * specularLight();
+    vec3 litColour = baseColour * (ambientLight() + directLight) + reflectedLight;
 
     // หมอกแบบ exponential ช่วยให้วัตถุที่ไกลค่อยๆ กลืนกับสีท้องฟ้า
     float cameraDistance = length(viewPos - FragPos);

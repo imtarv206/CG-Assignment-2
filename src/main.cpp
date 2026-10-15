@@ -10,12 +10,13 @@
 #include <cmath>
 #include <filesystem>
 #include <iostream>
+#include <vector>
 
 #include "Libs/Mesh.h"
 #include "Libs/Shader.h"
 #include "Libs/Window.h"
-#include "LightSourceRenderer.h"
 #include "ProjectPaths.h"
+#include "ShadowMap.h"
 #include "SmokeSystem.h"
 
 // กำหนด STB_IMAGE_IMPLEMENTATION ในไฟล์นี้เพียงไฟล์เดียวเท่านั้น
@@ -122,15 +123,27 @@ int main()
     }
     std::cerr << "[SMOKE] Texture, shader, and billboard quad are ready.\n";
 
-    LightSourceRenderer lightSourceRenderer;
-    if (!lightSourceRenderer.initialise(
-            shaderDirectory / "light_source.vert",
-            shaderDirectory / "light_source.frag"))
+    // Shadow map ตาม Lab 13: depth texture 1024x1024 และ shader สำหรับ pass แรก
+    ShadowMap shadowMap;
+    if (!shadowMap.initialise(1024, 1024))
     {
-        std::cerr << "[ERROR] Cannot initialise the visible light source.\n";
+        std::cerr << "[ERROR] Cannot initialise shadow map.\n";
         return 1;
     }
-    std::cerr << "[LIGHT] Visible light source is ready.\n";
+
+    Shader depthShader;
+    depthShader.CreateFromFiles(
+        shaderDirectory / "shadow_depth.vert",
+        shaderDirectory / "shadow_depth.frag");
+    const GLint depthUniformModel = depthShader.GetUniformLocation("model");
+    const GLint depthUniformView = depthShader.GetUniformLocation("view");
+    const GLint depthUniformProjection = depthShader.GetUniformLocation("projection");
+    if (depthUniformModel < 0 || depthUniformView < 0 || depthUniformProjection < 0)
+    {
+        std::cerr << "[ERROR] Shadow depth shader is not ready.\n";
+        return 1;
+    }
+    std::cerr << "[SHADOW] Depth framebuffer and shader are ready.\n";
 
 	Mesh meru;
 	const std::filesystem::path objPath =
@@ -144,6 +157,19 @@ int main()
     	return 1;
 	}
 	std::cerr << "[4] OBJ and materials loaded.\n";
+
+    // พื้นรับเงา ไม่ถูกวาดลง depth map เพราะมีหน้าที่รับเงาจากตัวเมรุ
+    Mesh ground;
+    const std::vector<VertexPNU> groundVertices = {
+        {{-18.0f, -0.08f,  12.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+        {{ 18.0f, -0.08f,  12.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+        {{ 18.0f, -0.08f, -32.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
+        {{-18.0f, -0.08f, -32.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}
+    };
+    const std::vector<unsigned int> groundIndices = {0, 1, 2, 2, 3, 0};
+    ground.CreateMesh(groundVertices, groundIndices);
+    const glm::mat4 groundModel(1.0f);
+    const glm::vec3 groundColour(0.12f, 0.16f, 0.13f);
 
     // โหลด shader สำหรับโมเดลที่มีหลาย Material
     Shader sceneShader;
@@ -164,6 +190,9 @@ int main()
     const GLint uniformAmbientColour = sceneShader.GetUniformLocation("ambientColour");
     const GLint uniformFogColour = sceneShader.GetUniformLocation("fogColour");
     const GLint uniformFogDensity = sceneShader.GetUniformLocation("fogDensity");
+    const GLint uniformLightView = sceneShader.GetUniformLocation("lightView");
+    const GLint uniformLightProjection = sceneShader.GetUniformLocation("lightProjection");
+    const GLint uniformShadowMap = sceneShader.GetUniformLocation("shadowMap");
 
     // กล้องเริ่มต้นอยู่หน้าวัตถุและมองไปทาง -Z
     glm::vec3 cameraPos(0.0f, 0.0f, 5.0f);
@@ -176,6 +205,14 @@ int main()
     const glm::vec3 ambientColour(0.32f, 0.48f, 0.55f);
     const glm::vec3 fogColour(0.20f, 0.34f, 0.39f);
     constexpr float fogDensity = 0.035f;
+
+    // Orthographic light camera ตาม Lab 13 ครอบตัวเมรุและพื้นบริเวณที่รับเงา
+    const glm::mat4 lightProjection =
+        glm::ortho(-14.0f, 14.0f, -14.0f, 14.0f, 0.1f, 40.0f);
+    const glm::mat4 lightView = glm::lookAt(
+        lightPos,
+        glm::vec3(0.0f, 3.0f, -10.0f),
+        worldUp);
 
     const float aspect = static_cast<float>(mainWindow.getBufferWidth()) /
                          static_cast<float>(mainWindow.getBufferHeight());
@@ -219,6 +256,28 @@ int main()
 
         const glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraDirection, cameraUp);
 
+        // Pass 1: วาดตัวเมรุจากมุมมองแสงลง depth texture
+        shadowMap.beginDepthPass();
+        depthShader.UseShader();
+        glUniformMatrix4fv(depthUniformModel, 1, GL_FALSE, glm::value_ptr(model));
+        glUniformMatrix4fv(depthUniformView, 1, GL_FALSE, glm::value_ptr(lightView));
+        glUniformMatrix4fv(
+            depthUniformProjection,
+            1,
+            GL_FALSE,
+            glm::value_ptr(lightProjection));
+
+        // ใช้ back faces สร้าง depth เพื่อลด Peter Panning ตามแนวทางในเอกสาร
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_FRONT);
+        meru.RenderDepthOnly();
+        glCullFace(GL_BACK);
+        glDisable(GL_CULL_FACE);
+        shadowMap.endDepthPass(
+            mainWindow.getBufferWidth(),
+            mainWindow.getBufferHeight());
+
+        // Pass 2: วาดฉากจากมุมมองกล้องและนำ depth texture มาคำนวณเงา
         // สีพื้นหลังต้องตรงกับสีหมอก ขอบฉากจึงจะกลมกลืน
         glClearColor(fogColour.r, fogColour.g, fogColour.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -236,19 +295,26 @@ int main()
         glUniform3fv(uniformAmbientColour, 1, glm::value_ptr(ambientColour));
         glUniform3fv(uniformFogColour, 1, glm::value_ptr(fogColour));
         glUniform1f(uniformFogDensity, fogDensity);
+        glUniformMatrix4fv(uniformLightView, 1, GL_FALSE, glm::value_ptr(lightView));
+        glUniformMatrix4fv(
+            uniformLightProjection,
+            1,
+            GL_FALSE,
+            glm::value_ptr(lightProjection));
+        shadowMap.bindTexture(GL_TEXTURE1);
+        glUniform1i(uniformShadowMap, 1);
+        glActiveTexture(GL_TEXTURE0);
 
         // Mesh จะ bind Texture และ draw แยกตามแต่ละ usemtl ในไฟล์ OBJ
         meru.RenderMesh(uniformTexture, uniformUseTexture, uniformDiffuse);
 
-        // วาดดวงไฟหลังวัตถุทึบ เพื่อให้ถูกบังได้ตาม depth แต่ไม่เขียนทับ depth buffer
-        lightSourceRenderer.render(
-            view,
-            projection,
-            cameraRight,
-            cameraUp,
-            lightPos,
-            lightColour,
-            1.4f);
+        // พื้นใช้ shader เดียวกัน จึงรับเงา แสง และหมอกได้ต่อเนื่องกับตัวเมรุ
+        glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(groundModel));
+        ground.RenderMesh(
+            uniformTexture,
+            uniformUseTexture,
+            uniformDiffuse,
+            groundColour);
 
         // วาดควันหลังวัตถุทึบ เพื่อให้ depth test และ alpha blending ทำงานถูกต้อง
         smokeSystem.render(

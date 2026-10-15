@@ -594,7 +594,8 @@ bool Mesh::CreateMeshFromOBJ(const std::string& path, bool flipV)
 
 void Mesh::RenderMesh(GLint textureUniformLocation,
                       GLint useTextureUniformLocation,
-                      GLint diffuseUniformLocation) const
+                      GLint diffuseUniformLocation,
+                      const glm::vec3& fallbackDiffuse) const
 {
     if (VAO == 0 || indexCount == 0) return;
 
@@ -605,7 +606,8 @@ void Mesh::RenderMesh(GLint textureUniformLocation,
     {
         glBindTexture(GL_TEXTURE_2D, 0);
         if (useTextureUniformLocation >= 0) glUniform1i(useTextureUniformLocation, GL_FALSE);
-        if (diffuseUniformLocation >= 0) glUniform3f(diffuseUniformLocation, 0.8f, 0.8f, 0.8f);
+        if (diffuseUniformLocation >= 0)
+            glUniform3fv(diffuseUniformLocation, 1, glm::value_ptr(fallbackDiffuse));
         glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr);
     }
     else
@@ -632,6 +634,15 @@ void Mesh::RenderMesh(GLint textureUniformLocation,
     }
 
     glBindTexture(GL_TEXTURE_2D, 0);
+    glBindVertexArray(0);
+}
+
+void Mesh::RenderDepthOnly() const
+{
+    if (VAO == 0 || indexCount == 0) return;
+
+    glBindVertexArray(VAO);
+    glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);
 }
 

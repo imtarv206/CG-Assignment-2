@@ -7,16 +7,20 @@ layout(location = 2) in vec3 aNormal;
 out vec2 TexCoord;
 out vec3 Normal;
 out vec3 FragPos;
+out vec4 FragPosLightSpace;
 
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
+uniform mat4 lightView;
+uniform mat4 lightProjection;
 
 void main()
 {
     // แปลงตำแหน่ง vertex ไปยังพิกัดโลก เพื่อใช้คำนวณแสง
     vec4 worldPosition = model * vec4(pos, 1.0f);
     FragPos = worldPosition.xyz;
+    FragPosLightSpace = lightProjection * lightView * worldPosition;
 
     // ใช้ inverse-transpose เพื่อแปลง normal ให้ถูกต้องเมื่อ model มี scale
     Normal = mat3(transpose(inverse(model))) * aNormal;
