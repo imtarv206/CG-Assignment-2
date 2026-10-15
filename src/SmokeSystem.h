@@ -64,7 +64,8 @@ public:
                 const glm::mat4& projection,
                 const glm::vec3& cameraRight,
                 const glm::vec3& cameraUp,
-                const glm::vec3& cameraPosition);
+                const glm::vec3& cameraPosition,
+                float fogDensity);
 
     const std::vector<SmokeParticle>& getParticles() const { return particles; }
     std::size_t getParticleCount() const { return particles.size(); }
@@ -100,4 +101,6 @@ private:
     GLint uniformParticleOpacity = -1;
     GLint uniformSmokeColour = -1;
     GLint uniformSmokeTexture = -1;
+    GLint uniformViewPos = -1;
+    GLint uniformFogDensity = -1;
 };

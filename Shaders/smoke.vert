@@ -4,6 +4,7 @@ layout(location = 0) in vec2 corner;
 layout(location = 1) in vec2 textureCoordinate;
 
 out vec2 TexCoord;
+out vec3 FragPos;
 
 uniform mat4 view;
 uniform mat4 projection;
@@ -26,5 +27,6 @@ void main()
         + cameraUp * rotatedCorner.y * particleSize;
 
     TexCoord = textureCoordinate;
+    FragPos = worldPosition;
     gl_Position = projection * view * vec4(worldPosition, 1.0);
 }

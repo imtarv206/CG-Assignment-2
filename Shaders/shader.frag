@@ -13,12 +13,15 @@ uniform vec3 materialDiffuse;
 uniform vec3 lightColour;
 uniform vec3 lightPos;
 uniform vec3 viewPos;
+uniform vec3 ambientColour;
+uniform vec3 fogColour;
+uniform float fogDensity;
 
 // แสง Ambient: เพิ่มความสว่างพื้นฐานไม่ให้ด้านเงามืดสนิท
 vec3 ambientLight()
 {
     const float ambientStrength = 0.25f;
-    return lightColour * ambientStrength;
+    return ambientColour * ambientStrength;
 }
 
 // แสง Diffuse: ทำให้พื้นผิวที่หันเข้าหาแสงสว่างกว่าพื้นผิวที่หันออก
@@ -58,7 +61,15 @@ void main()
         alpha = texel.a;
     }
 
-    // ผสมสีของวัสดุกับ Ambient/Diffuse และบวก Specular เพื่อให้เห็นความลึก
+    // แสงสีส้มส่องตัวอาคาร โดยยังคง ambient โทนเย็นไว้ในบริเวณเงา
     vec3 litColour = baseColour * (ambientLight() + diffuseLight()) + specularLight();
-    colour = vec4(clamp(litColour, 0.0f, 1.0f), alpha);
+
+    // หมอกแบบ exponential ช่วยให้วัตถุที่ไกลค่อยๆ กลืนกับสีท้องฟ้า
+    float cameraDistance = length(viewPos - FragPos);
+    float fogAmount = 1.0f - exp(
+        -fogDensity * fogDensity * cameraDistance * cameraDistance);
+    fogAmount = clamp(fogAmount, 0.0f, 1.0f);
+
+    vec3 finalColour = mix(litColour, fogColour, fogAmount);
+    colour = vec4(clamp(finalColour, 0.0f, 1.0f), alpha);
 }

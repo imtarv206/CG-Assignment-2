@@ -14,6 +14,7 @@
 #include "Libs/Mesh.h"
 #include "Libs/Shader.h"
 #include "Libs/Window.h"
+#include "LightSourceRenderer.h"
 #include "ProjectPaths.h"
 #include "SmokeSystem.h"
 
@@ -121,6 +122,16 @@ int main()
     }
     std::cerr << "[SMOKE] Texture, shader, and billboard quad are ready.\n";
 
+    LightSourceRenderer lightSourceRenderer;
+    if (!lightSourceRenderer.initialise(
+            shaderDirectory / "light_source.vert",
+            shaderDirectory / "light_source.frag"))
+    {
+        std::cerr << "[ERROR] Cannot initialise the visible light source.\n";
+        return 1;
+    }
+    std::cerr << "[LIGHT] Visible light source is ready.\n";
+
 	Mesh meru;
 	const std::filesystem::path objPath =
     	modelDirectory / "meru.obj";
@@ -150,15 +161,21 @@ int main()
     const GLint uniformLightColour = sceneShader.GetUniformLocation("lightColour");
     const GLint uniformLightPos = sceneShader.GetUniformLocation("lightPos");
     const GLint uniformViewPos = sceneShader.GetUniformLocation("viewPos");
+    const GLint uniformAmbientColour = sceneShader.GetUniformLocation("ambientColour");
+    const GLint uniformFogColour = sceneShader.GetUniformLocation("fogColour");
+    const GLint uniformFogDensity = sceneShader.GetUniformLocation("fogDensity");
 
     // กล้องเริ่มต้นอยู่หน้าวัตถุและมองไปทาง -Z
     glm::vec3 cameraPos(0.0f, 0.0f, 5.0f);
     glm::vec3 cameraDirection(0.0f, 0.0f, -1.0f);
     const glm::vec3 worldUp(0.0f, 1.0f, 0.0f);
 
-    // วางแสงไว้สูงและอยู่หน้าตัวโมเดล เพื่อให้เห็นมิติหลังคาและผนัง
-    const glm::vec3 lightPos(3.0f, 8.0f, -5.0f);
-    const glm::vec3 lightColour(1.0f, 1.0f, 1.0f);
+    // แสงอุ่นด้านข้างตัดกับ ambient สีฟ้าเย็น ทำให้อาคารดูมีมิติในบรรยากาศครึ้ม
+    const glm::vec3 lightPos(-5.0f, 5.0f, -3.0f);
+    const glm::vec3 lightColour(1.0f, 0.48f, 0.16f);
+    const glm::vec3 ambientColour(0.32f, 0.48f, 0.55f);
+    const glm::vec3 fogColour(0.20f, 0.34f, 0.39f);
+    constexpr float fogDensity = 0.035f;
 
     const float aspect = static_cast<float>(mainWindow.getBufferWidth()) /
                          static_cast<float>(mainWindow.getBufferHeight());
@@ -202,7 +219,8 @@ int main()
 
         const glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraDirection, cameraUp);
 
-        glClearColor(0.035f, 0.035f, 0.04f, 1.0f);
+        // สีพื้นหลังต้องตรงกับสีหมอก ขอบฉากจึงจะกลมกลืน
+        glClearColor(fogColour.r, fogColour.g, fogColour.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         sceneShader.UseShader();
@@ -215,9 +233,22 @@ int main()
         glUniform3fv(uniformLightColour, 1, glm::value_ptr(lightColour));
         glUniform3fv(uniformLightPos, 1, glm::value_ptr(lightPos));
         glUniform3fv(uniformViewPos, 1, glm::value_ptr(cameraPos));
+        glUniform3fv(uniformAmbientColour, 1, glm::value_ptr(ambientColour));
+        glUniform3fv(uniformFogColour, 1, glm::value_ptr(fogColour));
+        glUniform1f(uniformFogDensity, fogDensity);
 
         // Mesh จะ bind Texture และ draw แยกตามแต่ละ usemtl ในไฟล์ OBJ
         meru.RenderMesh(uniformTexture, uniformUseTexture, uniformDiffuse);
+
+        // วาดดวงไฟหลังวัตถุทึบ เพื่อให้ถูกบังได้ตาม depth แต่ไม่เขียนทับ depth buffer
+        lightSourceRenderer.render(
+            view,
+            projection,
+            cameraRight,
+            cameraUp,
+            lightPos,
+            lightColour,
+            1.4f);
 
         // วาดควันหลังวัตถุทึบ เพื่อให้ depth test และ alpha blending ทำงานถูกต้อง
         smokeSystem.render(
@@ -225,7 +256,8 @@ int main()
             projection,
             cameraRight,
             cameraUp,
-            cameraPos);
+            cameraPos,
+            fogDensity);
 
         glUseProgram(0);
         mainWindow.swapBuffers();

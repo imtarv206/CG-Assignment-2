@@ -32,7 +32,7 @@ bool SmokeSystem::initialise(const std::filesystem::path& texturePath,
 {
     releaseGraphicsResources();
 
-    // Quad หนึ่งแผ่น: ตำแหน่งมุม XY ตามด้วยพิกัด UV
+    // Quad หนึ่งแผ่น: ตำแหน่งมุม X Y ตามด้วยพิกัด U V
     constexpr float vertices[] = {
         -0.5f, -0.5f, 0.0f, 0.0f,
          0.5f, -0.5f, 1.0f, 0.0f,
@@ -112,13 +112,16 @@ bool SmokeSystem::initialise(const std::filesystem::path& texturePath,
     uniformParticleOpacity = smokeShader.GetUniformLocation("particleOpacity");
     uniformSmokeColour = smokeShader.GetUniformLocation("smokeColour");
     uniformSmokeTexture = smokeShader.GetUniformLocation("smokeTexture");
+    uniformViewPos = smokeShader.GetUniformLocation("viewPos");
+    uniformFogDensity = smokeShader.GetUniformLocation("fogDensity");
 
     const bool uniformsReady =
         uniformView >= 0 && uniformProjection >= 0 &&
         uniformCameraRight >= 0 && uniformCameraUp >= 0 &&
         uniformParticleCenter >= 0 && uniformParticleSize >= 0 &&
         uniformParticleRotation >= 0 && uniformParticleOpacity >= 0 &&
-        uniformSmokeColour >= 0 && uniformSmokeTexture >= 0;
+        uniformSmokeColour >= 0 && uniformSmokeTexture >= 0 &&
+        uniformViewPos >= 0 && uniformFogDensity >= 0;
 
     if (!uniformsReady)
     {
@@ -178,7 +181,8 @@ void SmokeSystem::render(const glm::mat4& view,
                          const glm::mat4& projection,
                          const glm::vec3& cameraRight,
                          const glm::vec3& cameraUp,
-                         const glm::vec3& cameraPosition)
+                         const glm::vec3& cameraPosition,
+                         float fogDensity)
 {
     if (!graphicsReady || particles.empty())
         return;
@@ -204,8 +208,11 @@ void SmokeSystem::render(const glm::mat4& view,
     glUniformMatrix4fv(uniformProjection, 1, GL_FALSE, glm::value_ptr(projection));
     glUniform3fv(uniformCameraRight, 1, glm::value_ptr(cameraRight));
     glUniform3fv(uniformCameraUp, 1, glm::value_ptr(cameraUp));
-    glUniform3f(uniformSmokeColour, 0.52f, 0.54f, 0.57f);
+    // ใช้โทนเดียวกับหมอกและท้องฟ้า เพื่อไม่ให้ควันดูแยกจากฉาก
+    glUniform3f(uniformSmokeColour, 0.35f, 0.43f, 0.46f);
     glUniform1i(uniformSmokeTexture, 0);
+    glUniform3fv(uniformViewPos, 1, glm::value_ptr(cameraPosition));
+    glUniform1f(uniformFogDensity, fogDensity);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, smokeTexture);
