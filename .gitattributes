@@ -1,1 +1,2 @@
 Models/meru-new-edited.obj filter=lfs diff=lfs merge=lfs -text
+Models/meru.obj filter=lfs diff=lfs merge=lfs -text
