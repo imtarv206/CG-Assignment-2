@@ -35,6 +35,8 @@ namespace
         std::filesystem::u8path(OPENGL_STARTER_SHADER_DIR);
     const std::filesystem::path modelDirectory =
         std::filesystem::u8path(OPENGL_STARTER_MODEL_DIR);
+    const std::filesystem::path textureDirectory =
+        std::filesystem::u8path(OPENGL_STARTER_TEXTURE_DIR);
 
     // อ่านการเคลื่อนเมาส์แล้วปรับทิศทางกล้อง
     void updateMouseLook(Window& window)
@@ -95,6 +97,30 @@ int main()
 	}
 	std::cerr << "[2] Window initialized.\n";
 	glEnable(GL_DEPTH_TEST);
+
+    // Transform ของโมเดลคงที่ จึงคำนวณครั้งเดียวนอก render loop
+    glm::mat4 model(1.0f);
+    model = glm::translate(model, glm::vec3(0.0f, 0.0f, -10.0f));
+    model = glm::scale(model, glm::vec3(0.4f));
+
+    // ตำแหน่งปากปล่องในพิกัด local ของไฟล์ OBJ
+    // ปรับ X = ซ้าย/ขวา, Y = ต่ำ/สูง, Z = หน้า/หลัง ได้ที่บรรทัดนี้
+    const glm::vec3 smokeEmitterLocal(-7.43f, 20.55f, -0.15f);
+    const glm::vec3 smokeEmitterWorld =
+        glm::vec3(model * glm::vec4(smokeEmitterLocal, 1.0f));
+
+    // เตรียมทรัพยากรควันหลังมี OpenGL context และก่อนโหลดโมเดลขนาดใหญ่
+    SmokeSystem smokeSystem(smokeEmitterWorld);
+    if (!smokeSystem.initialise(
+            textureDirectory / "smoke-clean.png",
+            shaderDirectory / "smoke.vert",
+            shaderDirectory / "smoke.frag"))
+    {
+        std::cerr << "[ERROR] Cannot initialise smoke rendering.\n";
+        return 1;
+    }
+    std::cerr << "[SMOKE] Texture, shader, and billboard quad are ready.\n";
+
 	Mesh meru;
 	const std::filesystem::path objPath =
     	modelDirectory / "meru.obj";
@@ -133,9 +159,6 @@ int main()
     // วางแสงไว้สูงและอยู่หน้าตัวโมเดล เพื่อให้เห็นมิติหลังคาและผนัง
     const glm::vec3 lightPos(3.0f, 8.0f, -5.0f);
     const glm::vec3 lightColour(1.0f, 1.0f, 1.0f);
-
-    // จุดปล่อยชั่วคราว จะปรับให้ตรงปากปล่องหลังจากเริ่มวาดควันได้แล้ว
-    SmokeSystem smokeSystem(glm::vec3(0.0f, 3.5f, -10.0f));
 
     const float aspect = static_cast<float>(mainWindow.getBufferWidth()) /
                          static_cast<float>(mainWindow.getBufferHeight());
@@ -179,11 +202,6 @@ int main()
 
         const glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraDirection, cameraUp);
 
-        // ปรับ scale/ตำแหน่งตรงนี้ได้ หากโมเดลใหม่มีขนาดหรือจุดกำเนิดต่างจากไฟล์เดิม
-        glm::mat4 model(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, -10.0f));
-        model = glm::scale(model, glm::vec3(0.4f));
-
         glClearColor(0.035f, 0.035f, 0.04f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -200,6 +218,14 @@ int main()
 
         // Mesh จะ bind Texture และ draw แยกตามแต่ละ usemtl ในไฟล์ OBJ
         meru.RenderMesh(uniformTexture, uniformUseTexture, uniformDiffuse);
+
+        // วาดควันหลังวัตถุทึบ เพื่อให้ depth test และ alpha blending ทำงานถูกต้อง
+        smokeSystem.render(
+            view,
+            projection,
+            cameraRight,
+            cameraUp,
+            cameraPos);
 
         glUseProgram(0);
         mainWindow.swapBuffers();
