@@ -90,6 +90,7 @@ configure_file(
 add_executable(OpenGLStarter
   src/main.cpp
   src/ShadowMap.cpp
+  src/SkyDome.cpp
   src/SmokeSystem.cpp
   src/FlameRenderer.cpp
   src/Libs/Mesh.cpp

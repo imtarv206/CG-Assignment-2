@@ -18,6 +18,7 @@
 #include "Libs/Window.h"
 #include "ProjectPaths.h"
 #include "ShadowMap.h"
+#include "SkyDome.h"
 #include "FlameRenderer.h"
 #include "SmokeSystem.h"
 
@@ -105,6 +106,26 @@ int main()
 	}
 	std::cerr << "[2] Window initialized.\n";
 	glEnable(GL_DEPTH_TEST);
+
+    // Skydome Step 1: สร้างครึ่งทรงกลมรัศมี 100 หน่วยจาก 48x16 ส่วน
+    // ขั้นนี้เตรียมเฉพาะ VAO/VBO/EBO; shader และการวาดจะเพิ่มในขั้นถัดไป
+    SkyDome skyDome;
+    if (!skyDome.initialise(100.0f, 48, 16))
+    {
+        std::cerr << "[ERROR] Cannot initialise skydome geometry.\n";
+        return 1;
+    }
+    std::cerr << "[SKYDOME] Geometry is ready: "
+              << skyDome.getVertexCount() << " vertices, "
+              << skyDome.getIndexCount() << " indices.\n";
+    if (!skyDome.initialiseShaders(
+            shaderDirectory / "skydome.vert",
+            shaderDirectory / "skydome.frag"))
+    {
+        std::cerr << "[ERROR] Cannot initialise skydome shaders.\n";
+        return 1;
+    }
+    std::cerr << "[SKYDOME] Gradient and cloud shaders are ready.\n";
 
     // Transform ของโมเดลคงที่ จึงคำนวณครั้งเดียวนอก render loop
     glm::mat4 model(1.0f);
@@ -240,6 +261,8 @@ int main()
     const glm::vec3 lightColour(1.0f, 0.48f, 0.16f);
     const glm::vec3 ambientColour(0.32f, 0.48f, 0.55f);
     const glm::vec3 fogColour(0.20f, 0.34f, 0.39f);
+    const glm::vec3 skyZenithColour(0.035f, 0.09f, 0.14f);
+    const glm::vec3 skyCloudColour(0.38f, 0.44f, 0.46f);
     constexpr float fogDensity = 0.035f;
 
     // กล้องแสงแบบ Orthographic ครอบคลุมตัวเมรุและพื้นที่ที่ต้องรับเงา
@@ -398,6 +421,15 @@ int main()
             uniformUseTexture,
             uniformDiffuse,
             groundColour);
+
+        // วาดท้องฟ้าหลังวัตถุทึบ แต่ก่อนอนุภาคโปร่งใส เพื่อให้ blending ถูกต้อง
+        skyDome.render(
+            view,
+            projection,
+            fogColour,
+            skyZenithColour,
+            skyCloudColour,
+            currentTime);
 
         // วาดอนุภาคไฟหลังวัตถุทึบ เพื่อให้ผนังและอาคารบังไฟได้ด้วย Depth Test
         flameRenderer.render(
