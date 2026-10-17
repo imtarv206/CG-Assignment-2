@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <glm/gtc/type_ptr.hpp>
+#include <stb_image.h>
 
 namespace
 {
@@ -39,12 +40,15 @@ bool SkyDome::initialise(float radius,
         static_cast<std::size_t>(sectorCount) * 6);
 
     const float sectorStep = 2.0f * PI / static_cast<float>(sectorCount);
-    const float elevationStep = 0.5f * PI / static_cast<float>(stackCount);
+    constexpr float minimumElevation = -PI / 6.0f; // ต่ำกว่าขอบฟ้า 30 องศา
+    const float elevationStep =
+        (0.5f * PI - minimumElevation) / static_cast<float>(stackCount);
 
-    // วงล่างเริ่มที่เส้นขอบฟ้า (elevation = 0) และวงบนสุดจบที่ยอดโดม 90 องศา
+    // ยื่นวงล่างลงใต้เส้นขอบฟ้า เพื่อไม่ให้เห็นช่องว่างเมื่อกล้องก้มลง
     for (unsigned int stack = 0; stack <= stackCount; ++stack)
     {
-        const float elevation = static_cast<float>(stack) * elevationStep;
+        const float elevation =
+            minimumElevation + static_cast<float>(stack) * elevationStep;
         const float horizontalRadius = radius * std::cos(elevation);
         const float y = radius * std::sin(elevation);
 
@@ -119,15 +123,12 @@ bool SkyDome::initialiseShaders(
     skyShader.CreateFromFiles(vertexShaderPath, fragmentShaderPath);
     uniformView = skyShader.GetUniformLocation("view");
     uniformProjection = skyShader.GetUniformLocation("projection");
-    uniformHorizonColour = skyShader.GetUniformLocation("horizonColour");
-    uniformZenithColour = skyShader.GetUniformLocation("zenithColour");
-    uniformCloudColour = skyShader.GetUniformLocation("cloudColour");
-    uniformTime = skyShader.GetUniformLocation("time");
+    uniformPanorama = skyShader.GetUniformLocation("skyPanorama");
+    uniformPanoramaYaw = skyShader.GetUniformLocation("panoramaYaw");
 
     shaderReady =
         uniformView >= 0 && uniformProjection >= 0 &&
-        uniformHorizonColour >= 0 && uniformZenithColour >= 0 &&
-        uniformCloudColour >= 0 && uniformTime >= 0;
+        uniformPanorama >= 0 && uniformPanoramaYaw >= 0;
 
     if (!shaderReady)
         std::cerr << "SkyDome shader is missing one or more required uniforms.\n";
@@ -135,23 +136,91 @@ bool SkyDome::initialiseShaders(
     return shaderReady;
 }
 
+bool SkyDome::initialiseTexture(const std::filesystem::path& texturePath)
+{
+    if (panoramaTexture != 0)
+    {
+        glDeleteTextures(1, &panoramaTexture);
+        panoramaTexture = 0;
+    }
+
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+    const std::string filename = texturePath.string();
+    unsigned char* pixels = stbi_load(filename.c_str(), &width, &height, &channels, 0);
+    if (pixels == nullptr)
+    {
+        std::cerr << "[SKYDOME] Cannot load panorama: " << filename
+                  << " | " << stbi_failure_reason() << '\n';
+        return false;
+    }
+
+    GLenum format = GL_RGB;
+    GLenum internalFormat = GL_RGB8;
+    if (channels == 1)
+    {
+        format = GL_RED;
+        internalFormat = GL_R8;
+    }
+    else if (channels == 2)
+    {
+        format = GL_RG;
+        internalFormat = GL_RG8;
+    }
+    else if (channels == 4)
+    {
+        format = GL_RGBA;
+        internalFormat = GL_RGBA8;
+    }
+    else if (channels != 3)
+    {
+        std::cerr << "[SKYDOME] Unsupported channel count: " << channels << '\n';
+        stbi_image_free(pixels);
+        return false;
+    }
+
+    glGenTextures(1, &panoramaTexture);
+    glBindTexture(GL_TEXTURE_2D, panoramaTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(
+        GL_TEXTURE_2D,
+        0,
+        internalFormat,
+        width,
+        height,
+        0,
+        format,
+        GL_UNSIGNED_BYTE,
+        pixels);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    stbi_image_free(pixels);
+
+    std::cout << "[SKYDOME] Panorama loaded: " << filename
+              << " (" << width << 'x' << height << ")\n";
+    return panoramaTexture != 0;
+}
+
 void SkyDome::render(const glm::mat4& view,
                      const glm::mat4& projection,
-                     const glm::vec3& horizonColour,
-                     const glm::vec3& zenithColour,
-                     const glm::vec3& cloudColour,
-                     float elapsedTime)
+                     float panoramaYawRadians)
 {
-    if (!shaderReady || vao == 0 || indexCount == 0)
+    if (!shaderReady || panoramaTexture == 0 || vao == 0 || indexCount == 0)
         return;
 
     skyShader.UseShader();
     glUniformMatrix4fv(uniformView, 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(uniformProjection, 1, GL_FALSE, glm::value_ptr(projection));
-    glUniform3fv(uniformHorizonColour, 1, glm::value_ptr(horizonColour));
-    glUniform3fv(uniformZenithColour, 1, glm::value_ptr(zenithColour));
-    glUniform3fv(uniformCloudColour, 1, glm::value_ptr(cloudColour));
-    glUniform1f(uniformTime, elapsedTime);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, panoramaTexture);
+    glUniform1i(uniformPanorama, 0);
+    glUniform1f(uniformPanoramaYaw, panoramaYawRadians);
 
     // Vertex shader วางโดมที่ depth = 1 จึงใช้ LEQUAL และปิดการเขียน depth
     // วัตถุทึบที่วาดก่อนหน้าจะบังท้องฟ้า ส่วนควันจะถูกวาดทับในลำดับถัดไป
@@ -164,6 +233,7 @@ void SkyDome::render(const glm::mat4& view,
         GL_UNSIGNED_INT,
         nullptr);
     glBindVertexArray(0);
+    glBindTexture(GL_TEXTURE_2D, 0);
     glDepthMask(GL_TRUE);
     glDepthFunc(GL_LESS);
 }
@@ -188,14 +258,17 @@ void SkyDome::releaseGraphicsResources()
         glDeleteVertexArrays(1, &vao);
         vao = 0;
     }
+    if (panoramaTexture != 0)
+    {
+        glDeleteTextures(1, &panoramaTexture);
+        panoramaTexture = 0;
+    }
 
     vertexCount = 0;
     indexCount = 0;
 
     uniformView = -1;
     uniformProjection = -1;
-    uniformHorizonColour = -1;
-    uniformZenithColour = -1;
-    uniformCloudColour = -1;
-    uniformTime = -1;
+    uniformPanorama = -1;
+    uniformPanoramaYaw = -1;
 }

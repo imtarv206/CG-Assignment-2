@@ -107,7 +107,7 @@ int main()
 	std::cerr << "[2] Window initialized.\n";
 	glEnable(GL_DEPTH_TEST);
 
-    // Skydome Step 1: สร้างครึ่งทรงกลมรัศมี 100 หน่วยจาก 48x16 ส่วน
+    // Skydome Step 1: สร้างโดมรัศมี 100 หน่วยจาก 48x16 ส่วน
     // ขั้นนี้เตรียมเฉพาะ VAO/VBO/EBO; shader และการวาดจะเพิ่มในขั้นถัดไป
     SkyDome skyDome;
     if (!skyDome.initialise(100.0f, 48, 16))
@@ -125,7 +125,13 @@ int main()
         std::cerr << "[ERROR] Cannot initialise skydome shaders.\n";
         return 1;
     }
-    std::cerr << "[SKYDOME] Gradient and cloud shaders are ready.\n";
+    if (!skyDome.initialiseTexture(
+            textureDirectory / "qwantani_dusk_2_puresky.jpg"))
+    {
+        std::cerr << "[ERROR] Cannot initialise skydome panorama.\n";
+        return 1;
+    }
+    std::cerr << "[SKYDOME] Panorama shader and texture are ready.\n";
 
     // Transform ของโมเดลคงที่ จึงคำนวณครั้งเดียวนอก render loop
     glm::mat4 model(1.0f);
@@ -256,21 +262,29 @@ int main()
     glm::vec3 cameraDirection(0.0f, 0.0f, -1.0f);
     const glm::vec3 worldUp(0.0f, 1.0f, 0.0f);
 
-    // แสงอุ่นด้านข้างตัดกับ ambient สีฟ้าเย็น ทำให้อาคารดูมีมิติในบรรยากาศครึ้ม
-    const glm::vec3 lightPos(-5.0f, 5.0f, -3.0f);
-    const glm::vec3 lightColour(1.0f, 0.48f, 0.16f);
-    const glm::vec3 ambientColour(0.32f, 0.48f, 0.55f);
-    const glm::vec3 fogColour(0.20f, 0.34f, 0.39f);
-    const glm::vec3 skyZenithColour(0.035f, 0.09f, 0.14f);
-    const glm::vec3 skyCloudColour(0.38f, 0.44f, 0.46f);
-    constexpr float fogDensity = 0.035f;
+    // หมุน panorama ให้ดวงอาทิตย์อยู่ด้านหน้ากล้องเริ่มต้น และใช้ทิศเดียวกันกับ
+    // แสงหลัก/Shadow Map เพื่อให้ทิศเงาสัมพันธ์กับภาพท้องฟ้า
+    constexpr float panoramaYawDegrees = 182.0f;
+    const float panoramaYawRadians = glm::radians(panoramaYawDegrees);
+    const float sunAzimuth = glm::radians(-142.0f);
+    const float sunElevation = glm::radians(6.0f);
+    const glm::vec3 sunDirection(
+        std::cos(sunElevation) * std::cos(sunAzimuth),
+        std::sin(sunElevation),
+        std::cos(sunElevation) * std::sin(sunAzimuth));
+    const glm::vec3 lightTarget(0.0f, 3.0f, -10.0f);
+    const glm::vec3 lightPos = lightTarget + sunDirection * 30.0f;
+    const glm::vec3 lightColour(1.0f, 0.72f, 0.62f);
+    const glm::vec3 ambientColour(0.56f, 0.52f, 0.68f);
+    const glm::vec3 fogColour(0.56f, 0.50f, 0.62f);
+    constexpr float fogDensity = 0.022f;
 
     // กล้องแสงแบบ Orthographic ครอบคลุมตัวเมรุและพื้นที่ที่ต้องรับเงา
     const glm::mat4 lightProjection =
         glm::ortho(-14.0f, 14.0f, -14.0f, 14.0f, 0.1f, 40.0f);
     const glm::mat4 lightView = glm::lookAt(
         lightPos,
-        glm::vec3(0.0f, 3.0f, -10.0f),
+        lightTarget,
         worldUp);
 
     const float aspect = static_cast<float>(mainWindow.getBufferWidth()) /
@@ -426,10 +440,7 @@ int main()
         skyDome.render(
             view,
             projection,
-            fogColour,
-            skyZenithColour,
-            skyCloudColour,
-            currentTime);
+            panoramaYawRadians);
 
         // วาดอนุภาคไฟหลังวัตถุทึบ เพื่อให้ผนังและอาคารบังไฟได้ด้วย Depth Test
         flameRenderer.render(
