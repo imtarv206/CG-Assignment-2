@@ -138,6 +138,60 @@ int main()
     model = glm::translate(model, glm::vec3(0.0f, 0.0f, -10.0f));
     model = glm::scale(model, glm::vec3(0.4f));
 
+    // ============================================================
+    // ตั้งค่า Transform ของพวงหรีดแยกจากตัวเมรุ
+    // ============================================================
+
+    // ปรับตำแหน่งพวงหรีดได้เอง:
+    // X = ซ้าย / ขวา
+    // Y = ต่ำ / สูง
+    // Z = หน้า / หลัง
+    // เริ่มจาก (0, 0, 0) ก่อน แล้วค่อยปรับตามตำแหน่งที่ต้องการ
+    glm::vec3 wreathPosition(3.5f, 0.0f, 1.5f);
+
+    // ปรับขนาดพวงหรีด: ค่าน้อยลง = เล็กลง, ค่ามากขึ้น = ใหญ่ขึ้น
+    float wreathScale = 0.55f;
+
+    // ปรับมุมหมุนพวงหรีด หน่วยเป็นองศา
+    // X = ก้ม / เงย, Y = หมุนซ้าย / ขวา, Z = เอียง
+    glm::vec3 wreathRotationDegrees(0.0f, 20.0f, 0.0f);
+
+    // สร้าง Model Matrix สำหรับพวงหรีดโดยเฉพาะ
+    // ใasช้ตำแหน่งฐานเดียวกับฉากเมรุ แต่สามารถเลื่อนพวงหรีดแยกได้
+    glm::mat4 wreathModel(1.0f);
+
+    // เลื่อนฉากไปยังตำแหน่งเดียวกับเมรุ
+    wreathModel = glm::translate(
+        wreathModel,
+        glm::vec3(0.0f, 0.0f, -10.0f)
+    );
+
+    // เลื่อนพวงหรีดแยกจากเมรุ โดยแก้ค่า wreathPosition ด้านบน
+    wreathModel = glm::translate(wreathModel, wreathPosition);
+
+    // หมุนพวงหรีดรอบแกน X, Y และ Z ตามลำดับ
+    wreathModel = glm::rotate(
+        wreathModel,
+        glm::radians(wreathRotationDegrees.x),
+        glm::vec3(1.0f, 0.0f, 0.0f)
+    );
+    wreathModel = glm::rotate(
+        wreathModel,
+        glm::radians(wreathRotationDegrees.y),
+        glm::vec3(0.0f, 1.0f, 0.0f)
+    );
+    wreathModel = glm::rotate(
+        wreathModel,
+        glm::radians(wreathRotationDegrees.z),
+        glm::vec3(0.0f, 0.0f, 1.0f)
+    );
+
+    // ปรับขนาดพวงหรีดโดยไม่เปลี่ยนขนาดตัวเมรุ
+    wreathModel = glm::scale(
+        wreathModel,
+        glm::vec3(wreathScale)
+    );
+
     // ตำแหน่งปากปล่องในพิกัด local ของไฟล์ OBJ
     // ปรับ X = ซ้าย/ขวา, Y = ต่ำ/สูง, Z = หน้า/หลัง ได้ที่บรรทัดนี้
     const glm::vec3 smokeEmitterLocal(-7.43f, 20.55f, -0.15f);
@@ -196,7 +250,7 @@ int main()
 	Mesh meru;
 	const std::filesystem::path objPath =
     	modelDirectory / "meru.obj";
-	std::cerr << "[3] Loading OBJ: "
+	std::cerr << "[3] Loading MERU: "
     	      << objPath.string() << std::endl;
 	if (!meru.CreateMeshFromOBJ(objPath.string()))
 	{
@@ -204,7 +258,18 @@ int main()
         	      << "Check OBJ, MTL, and textures.\n";
     	return 1;
 	}
-	std::cerr << "[4] OBJ and materials loaded.\n";
+    Mesh wreath;
+    const std::filesystem::path wreathObjPath =
+        modelDirectory / "wreath-v1.obj";
+    std::cerr << "[4] Loading WREATH: "
+              << wreathObjPath.string() << std::endl;
+    if (!wreath.CreateMeshFromOBJ(wreathObjPath.string()))
+    {
+        std::cerr << "[ERROR] Cannot load wreath-v1.obj. "
+                  << "Check OBJ, MTL, and textures.\n";
+        return 1;
+    }
+	std::cerr << "[5] OBJ and materials loaded.\n";
 
     // พื้นรับเงา ไม่ถูกวาดลง depth map เพราะมีหน้าที่รับเงาจากตัวเมรุ
     Mesh ground;
@@ -366,20 +431,46 @@ int main()
         // ขั้นตอนที่ 1: วาดตัวเมรุจากมุมมองของแสงลงใน Depth Texture
         shadowMap.beginDepthPass();
         depthShader.UseShader();
-        glUniformMatrix4fv(depthUniformModel, 1, GL_FALSE, glm::value_ptr(model));
-        glUniformMatrix4fv(depthUniformView, 1, GL_FALSE, glm::value_ptr(lightView));
-        glUniformMatrix4fv(
-            depthUniformProjection,
-            1,
-            GL_FALSE,
-            glm::value_ptr(lightProjection));
+        // glUniformMatrix4fv(depthUniformModel, 1, GL_FALSE, glm::value_ptr(model));
+        // glUniformMatrix4fv(depthUniformView, 1, GL_FALSE, glm::value_ptr(lightView));
+        // glUniformMatrix4fv(
+        //     depthUniformProjection,
+        //     1,
+        //     GL_FALSE,
+        //     glm::value_ptr(lightProjection));
 
-        // ใช้ back faces สร้าง depth เพื่อลด Peter Panning ตามแนวทางในเอกสาร
+        // // ใช้ back faces สร้าง depth เพื่อลด Peter Panning ตามแนวทางในเอกสาร
+        // glEnable(GL_CULL_FACE);
+        // glCullFace(GL_FRONT);
+        // meru.RenderDepthOnly();
+        // glCullFace(GL_BACK);
+        // glDisable(GL_CULL_FACE);
+
         glEnable(GL_CULL_FACE);
         glCullFace(GL_FRONT);
+
+        // วาดเงาของเมรุจากมุมมองของแสง
+        glUniformMatrix4fv(
+            depthUniformModel, 1, GL_FALSE, glm::value_ptr(model)
+        );
         meru.RenderDepthOnly();
+
+        // วาดเงาของพวงหรีดด้วย Model Matrix ของตัวเอง
+        glUniformMatrix4fv(
+            depthUniformModel, 1, GL_FALSE,
+            glm::value_ptr(wreathModel)
+        );
+        wreath.RenderDepthOnly();
+
+        // คืนค่า Model Matrix เป็นของเมรุ
+        // เพื่อป้องกันการใช้ตำแหน่งพวงหรีดกับวัตถุอื่นโดยไม่ตั้งใจ
+        glUniformMatrix4fv(
+            depthUniformModel, 1, GL_FALSE, glm::value_ptr(model)
+        );
+
         glCullFace(GL_BACK);
         glDisable(GL_CULL_FACE);
+
         shadowMap.endDepthPass(
             mainWindow.getBufferWidth(),
             mainWindow.getBufferHeight());
@@ -427,6 +518,25 @@ int main()
 
         // Mesh จะผูก Texture และวาดแยกตาม Material แต่ละรายการที่ระบุด้วย usemtl ในไฟล์ OBJ
         meru.RenderMesh(uniformTexture, uniformUseTexture, uniformDiffuse);
+
+        // เปลี่ยน Model Matrix ให้เป็นของพวงหรีด
+        glUniformMatrix4fv(
+            uniformModel, 1, GL_FALSE,
+            glm::value_ptr(wreathModel)
+        );
+
+        // วาดพวงหรีดโดยใช้ Shader และ Material ระบบเดียวกับเมรุ
+        wreath.RenderMesh(
+            uniformTexture,
+            uniformUseTexture,
+            uniformDiffuse
+        );
+
+        // คืน Model Matrix กลับเป็นของเมรุ
+        // พื้นและวัตถุที่วาดต่อจากนี้จะได้ไม่ใช้ Transform ของพวงหรีด
+        glUniformMatrix4fv(
+            uniformModel, 1, GL_FALSE, glm::value_ptr(model)
+        );
 
         // พื้นใช้ shader เดียวกัน จึงรับเงา แสง และหมอกได้ต่อเนื่องกับตัวเมรุ
         glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(groundModel));
