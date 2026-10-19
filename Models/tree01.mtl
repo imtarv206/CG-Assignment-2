@@ -1,0 +1,33 @@
+# Blender 5.2.2 LTS MTL File: 'jacaranda_tree_1k.blend'
+# www.blender.org
+
+newmtl jacaranda_tree_branches
+Ka 1.000000 1.000000 1.000000
+Ks 0.300000 0.300000 0.300000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd jacaranda_tree_branches_diff_1k.png
+map_Ns jacaranda_tree_branches_rough_1k.png
+map_Bump -bm 1.000000 jacaranda_tree_branches_nor_gl_1k.png
+
+newmtl jacaranda_tree_leaves
+Ns 360.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.464639 0.800000 0.187849
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+
+newmtl jacaranda_tree_trunk
+Ns 222.071503
+Ka 1.000000 1.000000 1.000000
+Kd 0.214035 0.179076 0.117358
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2

@@ -36,3 +36,4 @@ Models/meru-new.obj
 # Keep the required edited model despite the global *.obj rule
 !Models/meru.obj
 !Models/wreath-v1.obj
+!Models/tree01.obj

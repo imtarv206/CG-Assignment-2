@@ -37,8 +37,8 @@ namespace
     // float pitch = 0.0f;
 
     // ค่ามุมกล้องเริ่มต้น: test
-    float yaw = -142.0f;
-    float pitch = 8.0f;
+    float yaw = -159.0f;
+    float pitch = 13.0f;
 
     const std::filesystem::path shaderDirectory =
         std::filesystem::u8path(OPENGL_STARTER_SHADER_DIR);
@@ -192,6 +192,53 @@ int main()
         glm::vec3(wreathScale)
     );
 
+    // ============================================================
+    // ตั้งค่า Transform ของต้นไม้ทั้งสองต้นแยกจากเมรุและพวงหรีด
+    // ต้นที่หนึ่งอยู่ทางซ้าย และขยับให้ลึกเข้าไปตามแนวมองของกล้องอีกเล็กน้อย
+    // ปรับตำแหน่ง ขนาด และมุมหมุนของต้นที่หนึ่งได้จากตัวแปรชุดแรก
+    // ============================================================
+    // ต้นที่หนึ่ง: ขยับจากตำแหน่งเดิม (-6.6, 0, -9.0) ให้ลึกเข้าไปจากเมรุ
+    // หากต้องการถอยลึกเข้าไปอีก ให้ลดค่า X และ Z ไปตามแนวมองของกล้อง
+    glm::vec3 treePosition(-8.5f, 0.0f, -9.6f);
+    float treeScale = 0.4f;
+    glm::vec3 treeRotationDegrees(0.0f, 0.0f, 0.0f);
+
+    glm::mat4 treeModel(1.0f);
+    treeModel = glm::translate(treeModel, treePosition);
+    treeModel = glm::rotate(
+        treeModel, glm::radians(treeRotationDegrees.x),
+        glm::vec3(1.0f, 0.0f, 0.0f));
+    treeModel = glm::rotate(
+        treeModel, glm::radians(treeRotationDegrees.y),
+        glm::vec3(0.0f, 1.0f, 0.0f));
+    treeModel = glm::rotate(
+        treeModel, glm::radians(treeRotationDegrees.z),
+        glm::vec3(0.0f, 0.0f, 1.0f));
+    treeModel = glm::scale(treeModel, glm::vec3(treeScale));
+
+    // ============================================================
+    // ตั้งค่า Transform ของต้นที่สองให้เห็นทางขวาของเมรุ
+    // ตำแหน่งเริ่มต้นอยู่ด้านข้างและขยับเข้าหากล้องเล็กน้อย
+    // เพื่อไม่ให้ต้นไม้ถูกเมรุบังมากเกินไปจากมุมกล้องปัจจุบัน
+    // ปรับ treeRightPosition, treeRightScale และ treeRightRotationDegrees ได้เอง
+    // ============================================================
+    glm::vec3 treeRightPosition(3.3f, 0.0f, -14.0f);
+    float treeRightScale = 0.4f;
+    glm::vec3 treeRightRotationDegrees(0.0f, 0.0f, 0.0f);
+
+    glm::mat4 treeRightModel(1.0f);
+    treeRightModel = glm::translate(treeRightModel, treeRightPosition);
+    treeRightModel = glm::rotate(
+        treeRightModel, glm::radians(treeRightRotationDegrees.x),
+        glm::vec3(1.0f, 0.0f, 0.0f));
+    treeRightModel = glm::rotate(
+        treeRightModel, glm::radians(treeRightRotationDegrees.y),
+        glm::vec3(0.0f, 1.0f, 0.0f));
+    treeRightModel = glm::rotate(
+        treeRightModel, glm::radians(treeRightRotationDegrees.z),
+        glm::vec3(0.0f, 0.0f, 1.0f));
+    treeRightModel = glm::scale(treeRightModel, glm::vec3(treeRightScale));
+
     // ตำแหน่งปากปล่องในพิกัด local ของไฟล์ OBJ
     // ปรับ X = ซ้าย/ขวา, Y = ต่ำ/สูง, Z = หน้า/หลัง ได้ที่บรรทัดนี้
     const glm::vec3 smokeEmitterLocal(-7.43f, 20.55f, -0.15f);
@@ -269,7 +316,18 @@ int main()
                   << "Check OBJ, MTL, and textures.\n";
         return 1;
     }
-	std::cerr << "[5] OBJ and materials loaded.\n";
+
+    Mesh tree;
+    const std::filesystem::path treeObjPath = modelDirectory / "tree01.obj";
+    std::cerr << "[5] Loading TREE: " << treeObjPath.string() << std::endl;
+    if (!tree.CreateMeshFromOBJ(treeObjPath.string()))
+    {
+        std::cerr << "[ERROR] Cannot load tree01.obj. "
+                  << "Check OBJ, MTL, and textures.\n";
+        return 1;
+    }
+
+	std::cerr << "[6] OBJ and materials loaded.\n";
 
     // พื้นรับเงา ไม่ถูกวาดลง depth map เพราะมีหน้าที่รับเงาจากตัวเมรุ
     Mesh ground;
@@ -320,25 +378,29 @@ int main()
     }
 
     // กล้องเริ่มต้น: test
-    glm::vec3 cameraPos(6.0f, 1.0f, -5.5f);
+    glm::vec3 cameraPos(9.25, 1.08f, -6.93f);
+    glm::vec3 cameraDirection(-0.91f, 0.23f, -0.35f);
 
     // กล้องเริ่มต้นอยู่หน้าวัตถุและมองไปทาง -Z
     // glm::vec3 cameraPos(0.0f, 0.0f, 5.0f);
-    glm::vec3 cameraDirection(0.0f, 0.0f, -1.0f);
+    // glm::vec3 cameraDirection(0.0f, 0.0f, -1.0f);
     const glm::vec3 worldUp(0.0f, 1.0f, 0.0f);
 
-    // หมุน panorama ให้ดวงอาทิตย์อยู่ด้านหน้ากล้องเริ่มต้น และใช้ทิศเดียวกันกับ
-    // แสงหลัก/Shadow Map เพื่อให้ทิศเงาสัมพันธ์กับภาพท้องฟ้า
+    // หมุน panorama ตามเดิม แต่กำหนดตำแหน่งและทิศทางแสงหลักใหม่ด้านล่าง
+    // หมายเหตุ: ดวงอาทิตย์ที่อยู่ในภาพ panorama เป็น texture จึงอาจไม่ตรงกับแสงจริง
     constexpr float panoramaYawDegrees = 182.0f;
     const float panoramaYawRadians = glm::radians(panoramaYawDegrees);
-    const float sunAzimuth = glm::radians(-142.0f);
-    const float sunElevation = glm::radians(6.0f);
-    const glm::vec3 sunDirection(
-        std::cos(sunElevation) * std::cos(sunAzimuth),
-        std::sin(sunElevation),
-        std::cos(sunElevation) * std::sin(sunAzimuth));
-    const glm::vec3 lightTarget(0.0f, 3.0f, -10.0f);
-    const glm::vec3 lightPos = lightTarget + sunDirection * 30.0f;
+
+    // ตำแหน่งแหล่งกำเนิดแสงตามค่าที่ระบุ (พิกัดโลก)
+    const glm::vec3 lightPos(5.2f, 6.0f, -3.05f);
+
+    // ทิศที่แสงส่องไป: ใช้เวกเตอร์ที่ให้มาและ normalize เพื่อความแม่นยำ
+    const glm::vec3 lightDirection = glm::normalize(
+        glm::vec3(-0.625f, -0.334f, -0.706f));
+
+    // จุดเป้าหมายของกล้องแสงอยู่ไปตามทิศทางแสง เพื่อให้ Shadow Map
+    // มองเห็นพื้นที่ที่แสงกำลังส่องผ่าน
+    const glm::vec3 lightTarget = lightPos + lightDirection * 30.0f;
     const glm::vec3 lightColour(1.0f, 0.72f, 0.62f);
     const glm::vec3 ambientColour(0.56f, 0.52f, 0.68f);
     const glm::vec3 fogColour(0.56f, 0.50f, 0.62f);
@@ -351,10 +413,6 @@ int main()
         lightPos,
         lightTarget,
         worldUp);
-
-    const float aspect = static_cast<float>(mainWindow.getBufferWidth()) /
-                         static_cast<float>(mainWindow.getBufferHeight());
-    const glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 500.0f);
 
     float previousTime = static_cast<float>(glfwGetTime());
 
@@ -428,26 +486,46 @@ int main()
 
         const glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraDirection, cameraUp);
 
+        // อ่านขนาด framebuffer จริงทุกเฟรม เพราะขนาดอาจเปลี่ยนเมื่อ maximize/full screen
+        int framebufferWidth = 0;
+        int framebufferHeight = 0;
+        glfwGetFramebufferSize(mainWindow.getWindow(), &framebufferWidth, &framebufferHeight);
+
+        // หากหน้าต่างถูก minimize ขนาดอาจเป็น 0 จึงข้ามการวาดเฟรมนี้ไปก่อน
+        if (framebufferWidth <= 0 || framebufferHeight <= 0)
+            continue;
+
+        // คำนวณ Projection ใหม่ตามอัตราส่วนภาพปัจจุบัน ป้องกันภาพยืด/ถูกตัด
+        const float aspect = static_cast<float>(framebufferWidth) /
+                             static_cast<float>(framebufferHeight);
+        const glm::mat4 projection = glm::perspective(
+            glm::radians(45.0f), aspect, 0.1f, 500.0f);
+
         // ขั้นตอนที่ 1: วาดตัวเมรุจากมุมมองของแสงลงใน Depth Texture
         shadowMap.beginDepthPass();
         depthShader.UseShader();
-        // glUniformMatrix4fv(depthUniformModel, 1, GL_FALSE, glm::value_ptr(model));
-        // glUniformMatrix4fv(depthUniformView, 1, GL_FALSE, glm::value_ptr(lightView));
-        // glUniformMatrix4fv(
-        //     depthUniformProjection,
-        //     1,
-        //     GL_FALSE,
-        //     glm::value_ptr(lightProjection));
 
-        // // ใช้ back faces สร้าง depth เพื่อลด Peter Panning ตามแนวทางในเอกสาร
-        // glEnable(GL_CULL_FACE);
-        // glCullFace(GL_FRONT);
-        // meru.RenderDepthOnly();
-        // glCullFace(GL_BACK);
-        // glDisable(GL_CULL_FACE);
+        // ส่ง View และ Projection ของกล้องแสงเข้า Depth Shader ทุกเฟรม
+        glUniformMatrix4fv(
+            depthUniformView, 1, GL_FALSE, glm::value_ptr(lightView));
+        glUniformMatrix4fv(
+            depthUniformProjection, 1, GL_FALSE, glm::value_ptr(lightProjection));
 
+        // ใช้ front-face culling ระหว่างสร้าง Shadow Map เพื่อลด shadow acne
         glEnable(GL_CULL_FACE);
         glCullFace(GL_FRONT);
+
+        // วาดเงาของต้นที่หนึ่งด้วย Model Matrix ของต้นนั้น
+        glUniformMatrix4fv(
+            depthUniformModel, 1, GL_FALSE, glm::value_ptr(treeModel)
+        );
+        tree.RenderDepthOnly();
+
+        // วาดเงาของต้นที่สองโดยใช้ Mesh เดิม แต่เปลี่ยน Model Matrix
+        glUniformMatrix4fv(
+            depthUniformModel, 1, GL_FALSE, glm::value_ptr(treeRightModel)
+        );
+        tree.RenderDepthOnly();
 
         // วาดเงาของเมรุจากมุมมองของแสง
         glUniformMatrix4fv(
@@ -471,9 +549,10 @@ int main()
         glCullFace(GL_BACK);
         glDisable(GL_CULL_FACE);
 
-        shadowMap.endDepthPass(
-            mainWindow.getBufferWidth(),
-            mainWindow.getBufferHeight());
+        shadowMap.endDepthPass(framebufferWidth, framebufferHeight);
+
+        // คืน viewport เป็นขนาด framebuffer ของหน้าต่างจริง (ไม่ใช่ 800x600 คงที่)
+        glViewport(0, 0, framebufferWidth, framebufferHeight);
 
         // ขั้นตอนที่ 2: วาดฉากจากมุมมองกล้องและใช้ Depth Texture คำนวณเงา
         // สีพื้นหลังต้องตรงกับสีหมอก ขอบฉากจึงจะกลมกลืน
@@ -516,6 +595,19 @@ int main()
         glUniform1i(uniformShadowMap, 1);
         glActiveTexture(GL_TEXTURE0);
 
+        // วาดต้นที่หนึ่ง โดย Depth Test จะจัดการการบังกับวัตถุอื่นให้
+        glUniformMatrix4fv(
+            uniformModel, 1, GL_FALSE, glm::value_ptr(treeModel));
+        tree.RenderMesh(uniformTexture, uniformUseTexture, uniformDiffuse);
+
+        // วาดต้นที่สองทางขวาของเมรุ โดยใช้ Mesh เดิมและ Model Matrix แยกกัน
+        glUniformMatrix4fv(
+            uniformModel, 1, GL_FALSE, glm::value_ptr(treeRightModel));
+        tree.RenderMesh(uniformTexture, uniformUseTexture, uniformDiffuse);
+
+        // วาดเมรุด้วย Model Matrix ของเมรุ
+        glUniformMatrix4fv(
+            uniformModel, 1, GL_FALSE, glm::value_ptr(model));
         // Mesh จะผูก Texture และวาดแยกตาม Material แต่ละรายการที่ระบุด้วย usemtl ในไฟล์ OBJ
         meru.RenderMesh(uniformTexture, uniformUseTexture, uniformDiffuse);
 
